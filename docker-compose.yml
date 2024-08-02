@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  db:
+    image: nouchka/sqlite3:latest
+    container_name: db
+    volumes:
+      - ./db.sqlite3:/app/data/db.sqlite3
+
+  redis:
+    image: redis:latest
+    command: redis-server
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    depends_on:
+      - db
+
+  celery:
+    build: .
+    command: celery -A DjangoWeatherReminder worker -l info -Q celery
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+
+  celery-beat:
+    build: .
+    command: celery -A DjangoWeatherReminder beat -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - celery
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - celery-beat
+
+volumes:
+  redis_data:
+    driver: local
